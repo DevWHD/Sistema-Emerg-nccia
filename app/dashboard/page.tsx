@@ -11,7 +11,6 @@ import { BloodTypeChart } from "@/components/dashboard/blood-type-chart";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { toast } from "sonner";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -21,13 +20,34 @@ interface EmergencyForm {
   blood_type: string;
   status: string;
   created_at: string;
+  form_data?: {
+    tipo_atendimento?: string | string[];
+    [key: string]: any;
+  };
 }
 
 interface ReportData {
   total: number;
   bloodTypeDistribution: Array<{ blood_type: string; count: number }>;
   recentForms: EmergencyForm[];
+  tipoAtendimentoCounts: Array<{ tipo: string; count: number }>;
 }
+
+const TIPOS_ATENDIMENTO = ["R.N.", "PUÉRPERA", "GINECOLOGIA", "OBSTETRICIA", "CM", "VVS"];
+
+const SETORES_INTERNACAO = [
+  "R.N.", "PUÉRPERA", "GINECOLOGIA", "OBSTETRICIA",
+  "ABORTO", "AB. LEGAL: VVS", "AB. L:ANENCEFALIA", "AB.L: R.VIDA DA GEST.", "CM",
+];
+
+const PROCEDIMENTOS_LISTA = [
+  { key: "proced_sulfato_mg", label: "Sulfato MG" },
+  { key: "proced_drenagem",   label: "Drenagem" },
+  { key: "proced_ctg",        label: "CTG" },
+  { key: "proced_tig",        label: "TIG" },
+  { key: "proced_curativo",   label: "Curativo" },
+  { key: "proced_outras",     label: "Outras" },
+];
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
@@ -45,6 +65,49 @@ export default function DashboardPage() {
     fetcher,
     { revalidateOnFocus: false }
   );
+
+  // Calcula contagens por tipo direto dos dados já carregados
+  const tipoAtendimentoCounts = TIPOS_ATENDIMENTO.map((tipo) => {
+    const count = Array.isArray(forms)
+      ? forms.filter((f: any) => {
+          const t = f.form_data?.tipo_atendimento;
+          if (Array.isArray(t)) return t.includes(tipo);
+          if (typeof t === "string") return t === tipo;
+          return false;
+        }).length
+      : 0;
+    return { tipo, count };
+  });
+
+  // Internados por setor
+  const internadoCounts = SETORES_INTERNACAO.map((setor) => {
+    const count = Array.isArray(forms)
+      ? forms.filter((f: any) => {
+          if (f.form_data?.internado !== "Sim") return false;
+          const s = f.form_data?.internado_setores;
+          if (Array.isArray(s)) return s.includes(setor);
+          if (typeof s === "string") return s === setor;
+          return false;
+        }).length
+      : 0;
+    return { setor, count };
+  });
+  const totalInternados = Array.isArray(forms)
+    ? forms.filter((f: any) => f.form_data?.internado === "Sim").length
+    : 0;
+
+  // Procedimentos realizados
+  const procedimentosCounts = PROCEDIMENTOS_LISTA.map(({ key, label }) => {
+    const count = Array.isArray(forms)
+      ? forms.filter((f: any) =>
+          f.form_data?.procedimentos === "Sim" && f.form_data?.[key] === true
+        ).length
+      : 0;
+    return { label, count };
+  });
+  const totalProcedimentos = Array.isArray(forms)
+    ? forms.filter((f: any) => f.form_data?.procedimentos === "Sim").length
+    : 0;
 
   useEffect(() => {
     if (status === "loading") return;
@@ -88,14 +151,36 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        {/* Cards de estatísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard
-            title="Total de Formulários"
-            value={reports?.total || 0}
-            description="Fichas de emergência criadas"
-            icon={<FileText className="h-4 w-4" />}
-          />
+        {/* Cards de estatísticas + Atendimentos por tipo */}
+        <div className="grid grid-cols-1 lg:grid-cols-7 gap-4 items-start">
+          {/* Total de Formulários */}
+          <div className="lg:col-span-1">
+            <StatsCard
+              title="Total de Formulários"
+              value={reports?.total || 0}
+              description="Fichas criadas"
+              icon={<FileText className="h-4 w-4" />}
+            />
+          </div>
+
+          {/* Atendimentos por tipo */}
+          <div className="lg:col-span-6">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 ml-1">Atendimentos por Tipo</p>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
+              {tipoAtendimentoCounts.map(({ tipo, count }) => (
+                <StatsCard
+                  key={tipo}
+                  title={tipo}
+                  value={count}
+                  description="atendimentos"
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Outros cards de estatísticas */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatsCard
             title="Contatos de Emergência"
             value="-"
@@ -114,6 +199,36 @@ export default function DashboardPage() {
             description="Avisos importantes"
             icon={<AlertCircle className="h-4 w-4" />}
           />
+        </div>
+
+        {/* Internações por setor */}
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <h2 className="text-xl font-semibold">Internações por Setor</h2>
+            <span className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+              {totalInternados} internadas no total
+            </span>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3">
+            {internadoCounts.map(({ setor, count }) => (
+              <StatsCard key={setor} title={setor} value={count} description="internadas" />
+            ))}
+          </div>
+        </div>
+
+        {/* Procedimentos realizados */}
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <h2 className="text-xl font-semibold">Procedimentos Realizados</h2>
+            <span className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+              {totalProcedimentos} fichas com procedimentos
+            </span>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+            {procedimentosCounts.map(({ label, count }) => (
+              <StatsCard key={label} title={label} value={count} description="realizados" />
+            ))}
+          </div>
         </div>
 
         {/* Gráficos */}

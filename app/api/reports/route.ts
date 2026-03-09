@@ -88,10 +88,40 @@ export async function GET(request: NextRequest) {
       params
     );
 
+    // Distribuição por tipo de atendimento (suporta array e string no form_data)
+    const TIPOS_ATENDIMENTO = ["R.N.", "PUÉRPERA", "GINECOLOGIA", "OBSTETRICIA", "CM", "VVS"];
+    const tipoAtendimentoDistribution = await queryMany(
+      `SELECT tipo, COUNT(*) as count
+       FROM emergency_forms,
+         jsonb_array_elements_text(
+           CASE
+             WHEN jsonb_typeof(form_data->'tipo_atendimento') = 'array'
+               THEN form_data->'tipo_atendimento'
+             WHEN form_data->>'tipo_atendimento' IS NOT NULL
+               THEN jsonb_build_array(form_data->>'tipo_atendimento')
+             ELSE '[]'::jsonb
+           END
+         ) AS tipo
+       WHERE user_id = $1
+         AND form_data->>'tipo_atendimento' IS NOT NULL
+         AND form_data->>'tipo_atendimento' != ''
+         AND form_data->>'tipo_atendimento' != '[]'
+       GROUP BY tipo`,
+      params
+    );
+
+    // Garante que todos os tipos aparecem, mesmo com count 0
+    const tipoMap = new Map(tipoAtendimentoDistribution.map((r: any) => [r.tipo, Number(r.count)]));
+    const tipoAtendimentoCounts = TIPOS_ATENDIMENTO.map((tipo) => ({
+      tipo,
+      count: tipoMap.get(tipo) || 0,
+    }));
+
     return NextResponse.json({
       total: totalForms[0]?.count || 0,
       bloodTypeDistribution,
       recentForms,
+      tipoAtendimentoCounts,
     });
   } catch (error) {
     console.error("Error fetching reports:", error);

@@ -30,7 +30,7 @@ const formSchema = z.object({
   idade: z.string().optional(),
   hora_entrada: z.string().optional(),
   local_pn: z.string().optional(),
-  tipo_atendimento: z.enum(["Gineco", "Pediatria", "CM", "Puérpera", "VVS"]).optional(),
+  tipo_atendimento: z.array(z.string()).optional().default([]),
 
   // INFORMAÇÕES CLÍNICAS
   queixa_principal: z.string().optional(),
@@ -66,6 +66,20 @@ const formSchema = z.object({
   mgso4: z.enum(["Sim", "Não"]).optional(),
   mgso4_hora: z.string().optional(),
 
+  // INTERNADO
+  internado: z.enum(["Sim", "Não"]).optional(),
+  internado_setores: z.array(z.string()).optional().default([]),
+
+  // PROCEDIMENTOS (seção nova)
+  procedimentos: z.enum(["Sim", "Não"]).optional(),
+  proced_sulfato_mg: z.boolean().default(false),
+  proced_drenagem: z.boolean().default(false),
+  proced_ctg: z.boolean().default(false),
+  proced_tig: z.boolean().default(false),
+  proced_curativo: z.boolean().default(false),
+  proced_outras: z.boolean().default(false),
+  proced_outras_texto: z.string().optional(),
+
   // OBSERVAÇÕES
   observacoes: z.string().optional(),
 
@@ -80,6 +94,9 @@ const formSchema = z.object({
 }).superRefine((data, ctx) => {
   if (data.proc_outros && !data.proc_outros_texto) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Descreva o procedimento", path: ["proc_outros_texto"] });
+  }
+  if (data.proced_outras && !data.proced_outras_texto) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Descreva o procedimento", path: ["proced_outras_texto"] });
   }
   if (data.destino === "Transferida" && !data.destino_transferida_para) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Informe o destino da transferência", path: ["destino_transferida_para"] });
@@ -107,13 +124,16 @@ export function FormEditor({ defaultValues, formId, mode }: FormEditorProps) {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      be: "", data: "", nome: "", idade: "", hora_entrada: "", local_pn: "",
+      be: "", data: "", nome: "", idade: "", hora_entrada: "", local_pn: "", tipo_atendimento: [],
       queixa_principal: "", g: "", p: "", a: "", ig: "",
       medicacoes_emergencia: "",
       proc_hgt: false, proc_hgt_valor: "", proc_ctg: false,
       proc_exames_lab: false, proc_medicacao: false, proc_outros: false, proc_outros_texto: "",
       destino_transferida_para: "", destino_andar: "", destino_setor: "",
       diagnostico_internacao: "", diagnostico_por: "",
+      internado_setores: [],
+      proced_sulfato_mg: false, proced_drenagem: false, proced_ctg: false,
+      proced_tig: false, proced_curativo: false, proced_outras: false, proced_outras_texto: "",
       hidralazina_doses: "", hidralazina_hora: "", mgso4_hora: "",
       observacoes: "",
       pa_entrada: "", tax: "", spo2: "", fc: "",
@@ -126,6 +146,9 @@ export function FormEditor({ defaultValues, formId, mode }: FormEditorProps) {
   const watchOutros = form.watch("proc_outros");
   const watchHidralazina = form.watch("hidralazina");
   const watchMgSO4 = form.watch("mgso4");
+  const watchInternado = form.watch("internado");
+  const watchProcedimentos = form.watch("procedimentos");
+  const watchProcedOutras = form.watch("proced_outras");
 
   async function onSubmit(data: FormData) {
     setIsLoading(true);
@@ -206,20 +229,28 @@ export function FormEditor({ defaultValues, formId, mode }: FormEditorProps) {
             <FormField control={form.control} name="tipo_atendimento" render={({ field }) => (
               <FormItem className="col-span-2 md:col-span-3">
                 <FormLabel>Tipo de Atendimento</FormLabel>
-                <FormControl>
-                  <RadioGroup
-                    onValueChange={field.onChange}
-                    value={field.value}
-                    className="flex flex-wrap gap-4 pt-1"
-                  >
-                    {["Gineco", "Pediatria", "CM", "Puérpera", "VVS"].map((tipo) => (
+                <div className="flex flex-wrap gap-4 pt-1">
+                  {["R.N.", "PUÉRPERA", "GINECOLOGIA", "OBSTETRICIA", "CM", "VVS"].map((tipo) => {
+                    const checked = Array.isArray(field.value) && field.value.includes(tipo);
+                    return (
                       <div key={tipo} className="flex items-center space-x-2">
-                        <RadioGroupItem value={tipo} id={`tipo-${tipo}`} />
-                        <label htmlFor={`tipo-${tipo}`} className="text-sm cursor-pointer">{tipo}</label>
+                        <Checkbox
+                          id={`tipo-${tipo}`}
+                          checked={checked}
+                          onCheckedChange={(val) => {
+                            const current = Array.isArray(field.value) ? field.value : [];
+                            if (val) {
+                              field.onChange([...current, tipo]);
+                            } else {
+                              field.onChange(current.filter((v) => v !== tipo));
+                            }
+                          }}
+                        />
+                        <label htmlFor={`tipo-${tipo}`} className="text-sm cursor-pointer font-medium">{tipo}</label>
                       </div>
-                    ))}
-                  </RadioGroup>
-                </FormControl>
+                    );
+                  })}
+                </div>
                 <FormMessage />
               </FormItem>
             )} />
@@ -448,21 +479,154 @@ export function FormEditor({ defaultValues, formId, mode }: FormEditorProps) {
           <CardHeader>
             <CardTitle className="text-base uppercase tracking-wide text-muted-foreground">Internação</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <FormField control={form.control} name="diagnostico_internacao" render={({ field }) => (
+          <CardContent className="space-y-4">
+            {/* Internado sim/não */}
+            <FormField control={form.control} name="internado" render={({ field }) => (
               <FormItem>
-                <FormLabel>Diagnóstico de internação</FormLabel>
-                <FormControl><Input {...field} /></FormControl>
+                <FormLabel className="text-sm font-medium">Paciente foi internada?</FormLabel>
+                <FormControl>
+                  <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6 pt-1">
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="Sim" id="internado-sim" />
+                      <label htmlFor="internado-sim" className="text-sm cursor-pointer">Sim</label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="Não" id="internado-nao" />
+                      <label htmlFor="internado-nao" className="text-sm cursor-pointer">Não</label>
+                    </div>
+                  </RadioGroup>
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )} />
-            <FormField control={form.control} name="diagnostico_por" render={({ field }) => (
+
+            {/* Setores de internação */}
+            {watchInternado === "Sim" && (
+              <FormField control={form.control} name="internado_setores" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">Setor de Internação</FormLabel>
+                  <div className="flex flex-wrap gap-x-6 gap-y-3 pt-1">
+                    {[
+                      "R.N.",
+                      "PUÉRPERA",
+                      "GINECOLOGIA",
+                      "OBSTETRICIA",
+                      "ABORTO",
+                      "AB. LEGAL: VVS",
+                      "AB. L:ANENCEFALIA",
+                      "AB.L: R.VIDA DA GEST.",
+                      "CM",
+                    ].map((setor) => {
+                      const checked = Array.isArray(field.value) && field.value.includes(setor);
+                      return (
+                        <div key={setor} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`setor-${setor}`}
+                            checked={checked}
+                            onCheckedChange={(val) => {
+                              const current = Array.isArray(field.value) ? field.value : [];
+                              field.onChange(val ? [...current, setor] : current.filter((v) => v !== setor));
+                            }}
+                          />
+                          <label htmlFor={`setor-${setor}`} className="text-sm cursor-pointer font-medium">{setor}</label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
+
+            <Separator />
+
+            {/* Diagnóstico */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <FormField control={form.control} name="diagnostico_internacao" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Diagnóstico de internação</FormLabel>
+                  <FormControl><Input {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="diagnostico_por" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Por</FormLabel>
+                  <FormControl><Input {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* PROCEDIMENTOS */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base uppercase tracking-wide text-muted-foreground">Procedimentos</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <FormField control={form.control} name="procedimentos" render={({ field }) => (
               <FormItem>
-                <FormLabel>Por</FormLabel>
-                <FormControl><Input {...field} /></FormControl>
+                <FormLabel className="text-sm font-medium">Foram realizados procedimentos?</FormLabel>
+                <FormControl>
+                  <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6 pt-1">
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="Sim" id="proced-sim" />
+                      <label htmlFor="proced-sim" className="text-sm cursor-pointer">Sim</label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="Não" id="proced-nao" />
+                      <label htmlFor="proced-nao" className="text-sm cursor-pointer">Não</label>
+                    </div>
+                  </RadioGroup>
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )} />
+
+            {watchProcedimentos === "Sim" && (
+              <div className="space-y-3 pl-1">
+                {([
+                  { name: "proced_sulfato_mg" as const, label: "Sulfato MG" },
+                  { name: "proced_drenagem" as const, label: "Drenagem" },
+                  { name: "proced_ctg" as const, label: "CTG" },
+                  { name: "proced_tig" as const, label: "TIG" },
+                  { name: "proced_curativo" as const, label: "Curativo" },
+                ] as const).map(({ name, label }) => (
+                  <FormField key={name} control={form.control} name={name} render={({ field }) => (
+                    <FormItem className="flex items-center space-x-2 space-y-0">
+                      <FormControl>
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} id={name} />
+                      </FormControl>
+                      <label htmlFor={name} className="text-sm cursor-pointer">{label}</label>
+                    </FormItem>
+                  )} />
+                ))}
+
+                {/* Outras */}
+                <div className="space-y-2">
+                  <FormField control={form.control} name="proced_outras" render={({ field }) => (
+                    <FormItem className="flex items-center space-x-2 space-y-0">
+                      <FormControl>
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} id="proced_outras" />
+                      </FormControl>
+                      <label htmlFor="proced_outras" className="text-sm cursor-pointer">Outras</label>
+                    </FormItem>
+                  )} />
+                  {watchProcedOutras && (
+                    <FormField control={form.control} name="proced_outras_texto" render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input placeholder="Descreva o procedimento (obrigatório)" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
