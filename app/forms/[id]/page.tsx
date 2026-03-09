@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { FormEditor, FormData } from "@/components/forms/form-editor";
 import { Button } from "@/components/ui/button";
@@ -13,7 +12,6 @@ import Link from "next/link";
 export default function FormDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { data: session } = useSession();
   const [defaultValues, setDefaultValues] = useState<Partial<FormData> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -52,7 +50,7 @@ export default function FormDetailPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <DashboardHeader user={session?.user} />
+        <DashboardHeader user={{ name: "Usuário" }} />
         <div className="flex items-center justify-center min-h-[60vh]">
           <p className="text-muted-foreground">Carregando ficha...</p>
         </div>
@@ -62,7 +60,7 @@ export default function FormDetailPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader user={session?.user} />
+      <DashboardHeader user={{ name: "Usuário" }} />
 
       <main className="container mx-auto py-8 px-4">
         <div className="max-w-3xl mx-auto">
@@ -95,29 +93,6 @@ export default function FormDetailPage() {
     </div>
   );
 }
-
-  id: string;
-  title: string;
-  blood_type: string;
-  allergies: string;
-  medications: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export default function FormDetailPage() {
-  const params = useParams();
-  const router = useRouter();
-  const { data: session } = useSession();
-  const [form, setForm] = useState<Form | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const id = params.id as string;
-
-  useEffect(() => {
-    if (!id) return;
 
     const fetchForm = async () => {
       try {

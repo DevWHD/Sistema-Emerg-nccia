@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useSession } from "next-auth/react";
 import useSWR from "swr";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
@@ -43,7 +42,6 @@ interface ReportData {
 const COLORS = ["#0ea5e9", "#06b6d4", "#10b981", "#f59e0b", "#ef4444"];
 
 export default function ReportsPage() {
-  const { data: session } = useSession();
   const [reportType, setReportType] = useState("summary");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -90,7 +88,7 @@ export default function ReportsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader user={session?.user} />
+      <DashboardHeader user={{ name: "Usuário" }} />
 
       <main className="container mx-auto py-8 px-4 space-y-8">
         <div>

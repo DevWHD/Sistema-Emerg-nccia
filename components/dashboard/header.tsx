@@ -1,6 +1,5 @@
 "use client";
 
-import { signOut } from "next-auth/react";
 import Link from "next/link";
 import {
   DropdownMenu,
@@ -12,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut, Settings, FileText, BarChart3 } from "lucide-react";
+import { Settings, FileText, BarChart3 } from "lucide-react";
 
 interface DashboardHeaderProps {
   user?: {
@@ -29,24 +28,27 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
     .toUpperCase() || "U";
 
   return (
-    <header className="border-b bg-background">
-      <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+    <header className="sticky top-0 z-50 border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-8">
-          <Link href="/dashboard" className="font-bold text-lg">
-            Fichas de Emergência
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-lg">+</span>
+            </div>
+            <span className="font-bold text-lg gradient-text hidden sm:inline">Fichas de Emergência</span>
           </Link>
           
-          <nav className="hidden md:flex items-center gap-6 text-sm">
+          <nav className="hidden md:flex items-center gap-1">
             <Link
               href="/dashboard"
-              className="text-foreground hover:text-muted-foreground"
+              className="px-3 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-accent/10 transition-colors"
             >
               <FileText className="inline h-4 w-4 mr-2" />
               Formulários
             </Link>
             <Link
               href="/reports"
-              className="text-foreground hover:text-muted-foreground"
+              className="px-3 py-2 rounded-lg text-sm font-medium text-foreground hover:bg-accent/10 transition-colors"
             >
               <BarChart3 className="inline h-4 w-4 mr-2" />
               Relatórios
@@ -56,18 +58,18 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary text-primary-foreground">
+            <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-accent/10">
+              <Avatar className="h-10 w-10">
+                <AvatarFallback className="bg-gradient-to-br from-purple-500 to-purple-700 text-white font-semibold">
                   {initials}
                 </AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">{user?.name}</p>
+                <p className="text-sm font-semibold leading-none">{user?.name}</p>
                 <p className="text-xs leading-none text-muted-foreground">
                   {user?.email}
                 </p>
@@ -75,17 +77,10 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/settings">
+              <Link href="/settings" className="cursor-pointer">
                 <Settings className="mr-2 h-4 w-4" />
                 Configurações
               </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => signOut({ callbackUrl: "/auth/signin" })}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

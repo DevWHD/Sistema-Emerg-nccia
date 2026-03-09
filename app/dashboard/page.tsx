@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { FileText, Users, Heart, AlertCircle } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/stats-card";
@@ -50,18 +48,16 @@ const PROCEDIMENTOS_LISTA = [
 ];
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   const { data: forms } = useSWR<EmergencyForm[]>(
-    status === "authenticated" ? "/api/forms" : null,
+    "/api/forms",
     fetcher,
     { revalidateOnFocus: false }
   );
 
   const { data: reports } = useSWR<ReportData>(
-    status === "authenticated" ? "/api/reports" : null,
+    "/api/reports",
     fetcher,
     { revalidateOnFocus: false }
   );
@@ -110,15 +106,10 @@ export default function DashboardPage() {
     : 0;
 
   useEffect(() => {
-    if (status === "loading") return;
-    if (status === "unauthenticated") {
-      router.push("/auth/signin");
-    } else {
-      setIsLoading(false);
-    }
-  }, [status, router]);
+    setIsLoading(false);
+  }, []);
 
-  if (isLoading || status === "loading") {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <p>Carregando...</p>
@@ -126,13 +117,9 @@ export default function DashboardPage() {
     );
   }
 
-  if (!session) {
-    return null;
-  }
-
   return (
     <div className="min-h-screen bg-background">
-      <DashboardHeader user={session.user} />
+      <DashboardHeader user={{ name: "Usuário" }} />
       
       <main className="container mx-auto py-8 px-4 space-y-8">
         {/* Título e ação */}
@@ -140,7 +127,7 @@ export default function DashboardPage() {
           <div>
             <h1 className="text-3xl font-bold">Painel de Controle</h1>
             <p className="text-muted-foreground mt-1">
-              Bem-vindo, {session.user?.name || "usuário"}!
+              Bem-vindo, {"usuário"}!
             </p>
           </div>
           <Link href="/forms/new">

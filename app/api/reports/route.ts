@@ -1,16 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { queryMany } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "Não autenticado" },
-        { status: 401 }
-      );
-    }
+    // Sem autenticação necessária
+    const userId = "default-user"; // Usar um usuário padrão
 
     const searchParams = request.nextUrl.searchParams;
     const reportType = searchParams.get("type") || "summary";
@@ -24,7 +18,7 @@ export async function GET(request: NextRequest) {
       FROM emergency_forms ef 
       WHERE ef.user_id = $1
     `;
-    const params: any[] = [session.user.id];
+    const params: any[] = [userId];
 
     if (reportType === "blood-types") {
       query += " AND ef.blood_type IS NOT NULL GROUP BY ef.blood_type";

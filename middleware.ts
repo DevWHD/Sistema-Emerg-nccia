@@ -18,23 +18,7 @@ const authRoutes = ["/auth/signin"];
 // /auth/signup é bloqueado — sistema interno, sem auto-cadastro
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const session = await auth();
-
-  // Se o usuário está tentando acessar uma rota protegida sem autenticação
-  if (protectedRoutes.some((route) => pathname.startsWith(route))) {
-    if (!session) {
-      return NextResponse.redirect(new URL("/auth/signin", request.url));
-    }
-  }
-
-  // Se o usuário está logado e tenta acessar rotas de auth
-  if (authRoutes.some((route) => pathname.startsWith(route))) {
-    if (session) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
-  }
-
+  // Sem autenticação necessária - acesso livre
   return NextResponse.next();
 }
 
